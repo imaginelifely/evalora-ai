@@ -7,7 +7,6 @@ import deepl
 
 router = APIRouter()
 
-# ✅ Load DeepL API key safely
 api_key = os.getenv("DEEPL_API_KEY")
 
 translator = None
@@ -17,18 +16,15 @@ if api_key:
     except Exception as e:
         print("DeepL Init Error:", e)
 
-# ✅ Load COMET model (only once)
 model_path = download_model("wmt20-comet-da")
 model = load_from_checkpoint(model_path)
 
-# ✅ Request schema
 class Request(BaseModel):
     src: str
     ref: str
     source_lang: str = "de"
     target_lang: str = "en"
 
-# ✅ API endpoint
 @router.post("/analyze")
 async def analyze(req: Request):
 
