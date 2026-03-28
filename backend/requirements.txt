@@ -1,0 +1,6 @@
+fastapi
+uvicorn
+pydantic
+deep-translator
+translators
+unbabel-comet
