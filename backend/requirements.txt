@@ -3,4 +3,5 @@ uvicorn
 pydantic
 deep-translator
 translators
-unbabel-cometdeepl
+unbabel-comet
+deepl
