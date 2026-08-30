@@ -1,8 +1,8 @@
 fastapi
 uvicorn
 pydantic
+python-dotenv
 deep-translator
 translators
 unbabel-comet
-deepl
-python-dotenv
+setuptools
