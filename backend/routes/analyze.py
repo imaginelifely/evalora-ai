@@ -1,240 +1,79 @@
 from fastapi import APIRouter
 from pydantic import BaseModel
-
 from deep_translator import GoogleTranslator
-from langdetect import detect
-
-import deepl
-import random
+from comet import download_model, load_from_checkpoint
 import os
-
-from dotenv import load_dotenv
-
-load_dotenv()
+import deepl
 
 router = APIRouter()
-
-# --------------------------------
-# DeepL setup
-# --------------------------------
 
 api_key = os.getenv("DEEPL_API_KEY")
 
 translator = None
-
 if api_key:
     try:
         translator = deepl.Translator(api_key)
-        print("✅ DeepL initialized successfully")
-
     except Exception as e:
-        print("❌ DeepL initialization failed:", e)
+        print("DeepL Init Error:", e)
 
-
-# --------------------------------
-# Request schema
-# --------------------------------
+model_path = download_model("wmt20-comet-da")
+model = load_from_checkpoint(model_path)
 
 class Request(BaseModel):
     src: str
-    source_lang: str = "auto"
+    ref: str
+    source_lang: str = "de"
     target_lang: str = "en"
-
-
-# --------------------------------
-# Mock AI score
-# --------------------------------
-
-def ai_score():
-    return random.randint(88, 98)
-
-
-# --------------------------------
-# Explanation generator
-# --------------------------------
-
-def generate_reason(
-    google_metrics,
-    deepl_metrics,
-    winner
-):
-
-    if winner == "DeepL":
-
-        return (
-            f"DeepL achieved higher semantic "
-            f"accuracy ({deepl_metrics['semantic']}%) "
-            f"and better contextual preservation "
-            f"({deepl_metrics['context']}%)."
-        )
-
-    return (
-        f"Google showed stronger fluency "
-        f"({google_metrics['fluency']}%) "
-        f"and confidence "
-        f"({google_metrics['confidence']}%)."
-    )
-
-
-# --------------------------------
-# API endpoint
-# --------------------------------
 
 @router.post("/analyze")
 async def analyze(req: Request):
 
-    # --------------------------------
-    # Detect language
-    # --------------------------------
+    # 🔹 Google Translation
+    google_text = GoogleTranslator(
+        source=req.source_lang,
+        target=req.target_lang
+    ).translate(req.src)
 
+    # 🔹 DeepL Translation (safe)
     try:
-        detected = detect(req.src)
-
-    except Exception:
-        detected = "unknown"
-
-    # --------------------------------
-    # Google Translate
-    # --------------------------------
-
-    try:
-
-        google_text = GoogleTranslator(
-            source="auto",
-            target=req.target_lang
-        ).translate(req.src)
-
-    except Exception as e:
-
-        print("Google Translate Error:", e)
-
-        google_text = "Translation failed"
-
-    # --------------------------------
-    # DeepL Translate
-    # --------------------------------
-
-    try:
-
         if translator:
-
-            deepl_target = (
-                "EN-US"
-                if req.target_lang == "en"
-                else req.target_lang.upper()
-            )
-
             deepl_text = translator.translate_text(
                 req.src,
-                target_lang=deepl_target
+                target_lang="EN-US"
             ).text
-
         else:
-
-            deepl_text = "DeepL API key missing"
-
+            deepl_text = "No API Key"
     except Exception as e:
-
         print("DeepL Error:", e)
+        deepl_text = "Unavailable"
 
-        deepl_text = "DeepL unavailable"
+    # 🔹 Google Score
+    g_score = model.predict([{
+        "src": req.src,
+        "mt": google_text,
+        "ref": req.ref
+    }])['scores'][0]
 
-    # --------------------------------
-    # AI Scores
-    # --------------------------------
+    # 🔹 DeepL Score (only if valid)
+    d_score = None
+    if deepl_text not in ["Unavailable", "No API Key"]:
+        try:
+            d_score = model.predict([{
+                "src": req.src,
+                "mt": deepl_text,
+                "ref": req.ref
+            }])['scores'][0]
+        except Exception as e:
+            print("COMET DeepL Error:", e)
 
-    google_score = ai_score()
-    deepl_score = ai_score()
-
-    # --------------------------------
-    # Metrics
-    # --------------------------------
-
-    google_metrics = {
-
-        "confidence": google_score,
-
-        "fluency":
-            random.randint(85, 95),
-
-        "semantic":
-            random.randint(84, 94),
-
-        "context":
-            random.randint(84, 94)
-    }
-
-    deepl_metrics = {
-
-        "confidence": deepl_score,
-
-        "fluency":
-            random.randint(88, 98),
-
-        "semantic":
-            random.randint(90, 99),
-
-        "context":
-            random.randint(90, 99)
-    }
-
-    # --------------------------------
-    # Winner selection
-    # --------------------------------
-
-    google_total = sum(
-        google_metrics.values()
-    )
-
-    deepl_total = sum(
-        deepl_metrics.values()
-    )
-
-    winner_engine = (
-        "Google"
-        if google_total >= deepl_total
-        else "DeepL"
-    )
-
-    winner_reason = generate_reason(
-        google_metrics,
-        deepl_metrics,
-        winner_engine
-    )
-
-    # --------------------------------
-    # Response
-    # --------------------------------
-
+    # 🔹 Response
     return {
-
-        "detected_language":
-            detected.upper(),
-
         "google": {
-
-            "text":
-                google_text,
-
-            "metrics":
-                google_metrics
+            "text": google_text,
+            "score": g_score
         },
-
         "deepl": {
-
-            "text":
-                deepl_text,
-
-            "metrics":
-                deepl_metrics
-        },
-
-        "winner": {
-
-            "engine":
-                winner_engine,
-
-            "reason":
-                winner_reason
+            "text": deepl_text,
+            "score": d_score
         }
     }
