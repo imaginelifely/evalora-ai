@@ -39,7 +39,7 @@ export default function Home() {
   const [result, setResult] = useState<TranslationResult | null>(null);
   const [isFabOpen, setIsFabOpen] = useState(false);
 
-  const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+  const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://evalora-ai-backend.onrender.com";
 
   async function analyze() {
     if (!text.trim()) {
