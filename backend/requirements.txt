@@ -6,4 +6,4 @@ deep-translator
 translators
 deepl
 unbabel-comet
-setuptools<82
+setuptools<81
