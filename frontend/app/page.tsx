@@ -39,6 +39,8 @@ export default function Home() {
   const [result, setResult] = useState<TranslationResult | null>(null);
   const [isFabOpen, setIsFabOpen] = useState(false);
 
+  const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+
   async function analyze() {
     if (!text.trim()) {
       alert("Please enter some text.");
@@ -49,7 +51,7 @@ export default function Home() {
     setResult(null);
 
     try {
-      const res = await fetch("/api/analyze", {
+      const res = await fetch(`${API_URL}/analyze`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
