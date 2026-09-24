@@ -1,7 +1,6 @@
 from fastapi import APIRouter
 from pydantic import BaseModel
 from deep_translator import GoogleTranslator
-from comet import download_model, load_from_checkpoint
 import translators as ts
 import os
 import deepl
@@ -29,8 +28,23 @@ if api_key:
 # Reference-free translation quality evaluation
 # ============================================================
 
-model_path = download_model("Unbabel/wmt22-cometkiwi-da")
-model = load_from_checkpoint(model_path)
+model = None
+
+
+def get_comet_model():
+    """Load COMET-KIWI only when the first scoring request needs it."""
+    global model
+
+    if model is None:
+        print("Loading COMET-KIWI model...")
+        from comet import download_model, load_from_checkpoint
+
+        model_path = download_model("Unbabel/wmt22-cometkiwi-da")
+        model = load_from_checkpoint(model_path)
+        model.eval()
+        print("COMET-KIWI model loaded.")
+
+    return model
 
 
 # ============================================================
@@ -94,7 +108,9 @@ def cometkiwi_score(
     translation: str
 ):
     try:
-        result = model.predict(
+        comet_model = get_comet_model()
+
+        result = comet_model.predict(
             [
                 {
                     "src": src,
